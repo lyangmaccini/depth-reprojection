@@ -8,8 +8,8 @@ class Scene:
         self.im1 = cv2.imread(filepath + "/im1.png")
         self.read_calib(filepath)
         self.f = self.cam0[0][0]
-        self.disp0 = utils.readPFM(filepath + "/disp0.pfm")[0]
-        self.disp1 = utils.readPFM(filepath + "/disp1.pfm")[0]   
+        self.disp0 = utils.readPFM(filepath + "/disp0.pfm")
+        self.disp1 = utils.readPFM(filepath + "/disp1.pfm")   
         self.disparity_to_depth()
         self.setup_extrinsics()
 
