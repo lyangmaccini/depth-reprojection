@@ -30,74 +30,84 @@ if __name__ == '__main__':
     scene = scene.Scene("data/" + data_filepath)
 
     if interpolate:
-        new_im0 = np.zeros_like(scene.im0)
-        new_im1 = np.zeros_like(scene.im1)
-        combined_image = np.zeros_like(scene.im0)
-
         if ix is None:
             ix = 0.5
+        iy = 0
+    else:
+        if ix is None:
+            ix = 0
+        iy = args.ycoord
+        if iy is None:
+            iy = 0
+        else:
+            iy = float(iy)
 
-        extrinsic_midpoint = utils.get_projection_matrix(0, 0, 0, 0, -ix * scene.baseline, 0, 0)
-        cam_midpoint = np.copy(scene.cam0)
-        cam_midpoint[0][2] += ix * scene.doffs 
+    new_im0 = np.zeros_like(scene.im0)
+    new_im1 = np.zeros_like(scene.im1)
+    combined_image = np.zeros_like(scene.im0)
 
-        depth_im0 = np.ones((new_im0.shape[0], new_im0.shape[1])) * np.inf
-        depth_im1 = np.ones((new_im0.shape[0], new_im0.shape[1])) * np.inf
+    extrinsic_midpoint = utils.get_projection_matrix(0, 0, 0, 0, -ix * scene.baseline, iy * scene.baseline, 0)
+    cam_midpoint = np.copy(scene.cam0)
+    cam_midpoint[0][2] += ix * scene.doffs 
+    cam_midpoint[1][2] += iy * scene.doffs
 
-        for r in range(scene.height):
-            for c in range(scene.width):
-                if not scene.holes_disp0[r, c]:
-                    depth = scene.disp0[r, c]
-                    # Find 3D point in each pixel 
-                    coords_3d_cam0 = depth * np.linalg.inv(scene.cam0) @ np.array([c, r, 1])
+    depth_im0 = np.ones((new_im0.shape[0], new_im0.shape[1])) * np.inf
+    depth_im1 = np.ones((new_im0.shape[0], new_im0.shape[1])) * np.inf
 
-                    # Find the coordinates of the original pixel in the interpolated image
-                    coords_2d_cam0 = cam_midpoint @ extrinsic_midpoint @ np.array([coords_3d_cam0[0], coords_3d_cam0[1], coords_3d_cam0[2], 1]) 
-                    
-                    # Convert to row/column indices
-                    r_new, c_new = int(coords_2d_cam0[1]/coords_2d_cam0[2]), int(coords_2d_cam0[0]/coords_2d_cam0[2])
+    for r in range(scene.height):
+        for c in range(scene.width):
+            if not scene.holes_disp0[r, c]:
+                depth = scene.disp0[r, c]
+                # Find 3D point in each pixel 
+                coords_3d_cam0 = depth * np.linalg.inv(scene.cam0) @ np.array([c, r, 1])
 
-                    if scene.in_bounds([c_new, r_new]):
-                        # Save the original pixel to the new image, making sure that the closer object is visible if 2 object of different depths map to the same pixel
-                        if depth < depth_im0[r_new, c_new]: 
-                            new_im0[r_new, c_new] = scene.im0[r, c] 
-                            # Keep track of which pixels have been mapped to and what depth what is in that pixel is at
-                            depth_im0[r_new, c_new] = depth
-  
-                if not scene.holes_disp1[r, c]:
-                    depth = scene.disp1[r, c]
-                    coords_3d_cam1 = depth * np.linalg.inv(scene.cam1) @ np.array([c, r, 1])
-                    
-                    # Account for the x-direction translation of the second camera
-                    coords_3d_cam1[0] += scene.baseline 
-
-                    coords_2d_cam1 = cam_midpoint @ extrinsic_midpoint @ np.array([coords_3d_cam1[0], coords_3d_cam1[1], coords_3d_cam1[2], 1])
-                    r_new, c_new = int(coords_2d_cam1[1]/coords_2d_cam1[2]), int(coords_2d_cam1[0]/coords_2d_cam1[2])
-
-                    if scene.in_bounds([c_new, r_new]):
-                        if depth < depth_im1[r_new, c_new]:
-                            new_im1[r_new, c_new] = scene.im1[r, c]
-                            depth_im1[r_new, c_new] = depth
-        print("Individual images reprojected.")
-        
-        # Interpolate between the two reprojected images
-        combined_image = 0.5 * new_im0 + 0.5 * new_im1
-
-        # Find what pixels are holes in each image by finding what wasn't mapped to in the new images
-        holes_im0 = np.transpose((depth_im0 == np.inf).nonzero())
-        holes_im1 = np.transpose((depth_im1 == np.inf).nonzero())
-
-        # Fill in holes with pixels from the other image to keep full opacity of pixels that aren't holes in at least one image
-        for hole in holes_im0:
-            combined_image[hole[0], hole[1]] = new_im1[hole[0], hole[1]]
-        for hole in holes_im1:
-            combined_image[hole[0], hole[1]] = new_im0[hole[0], hole[1]]
+                # Find the coordinates of the original pixel in the interpolated image
+                coords_2d_cam0 = cam_midpoint @ extrinsic_midpoint @ np.array([coords_3d_cam0[0], coords_3d_cam0[1], coords_3d_cam0[2], 1]) 
                 
-        holes_im0 = set([tuple(row) for row in holes_im0])
-        holes_im1 = set([tuple(row) for row in holes_im1])
-        overlapping_holes = holes_im0 & holes_im1
+                # Convert to row/column indices
+                r_new, c_new = int(coords_2d_cam0[1]/coords_2d_cam0[2]), int(coords_2d_cam0[0]/coords_2d_cam0[2])
 
-        # Average over nearby pixels for holes present in both images to fill in gaps
+                if scene.in_bounds([c_new, r_new]):
+                    # Save the original pixel to the new image, making sure that the closer object is visible if 2 object of different depths map to the same pixel
+                    if depth < depth_im0[r_new, c_new]: 
+                        new_im0[r_new, c_new] = scene.im0[r, c] 
+                        # Keep track of which pixels have been mapped to and what depth what is in that pixel is at
+                        depth_im0[r_new, c_new] = depth
+
+            if not scene.holes_disp1[r, c]:
+                depth = scene.disp1[r, c]
+                coords_3d_cam1 = depth * np.linalg.inv(scene.cam1) @ np.array([c, r, 1])
+                
+                # Account for the x-direction translation of the second camera
+                coords_3d_cam1[0] += scene.baseline 
+
+                coords_2d_cam1 = cam_midpoint @ extrinsic_midpoint @ np.array([coords_3d_cam1[0], coords_3d_cam1[1], coords_3d_cam1[2], 1])
+                r_new, c_new = int(coords_2d_cam1[1]/coords_2d_cam1[2]), int(coords_2d_cam1[0]/coords_2d_cam1[2])
+
+                if scene.in_bounds([c_new, r_new]):
+                    if depth < depth_im1[r_new, c_new]:
+                        new_im1[r_new, c_new] = scene.im1[r, c]
+                        depth_im1[r_new, c_new] = depth
+    print("Individual images reprojected.")
+        
+    # Interpolate between the two reprojected images
+    combined_image = 0.5 * new_im0 + 0.5 * new_im1
+
+    # Find what pixels are holes in each image by finding what wasn't mapped to in the new images
+    holes_im0 = np.transpose((depth_im0 == np.inf).nonzero())
+    holes_im1 = np.transpose((depth_im1 == np.inf).nonzero())
+
+    # Fill in holes with pixels from the other image to keep full opacity of pixels that aren't holes in at least one image
+    for hole in holes_im0:
+        combined_image[hole[0], hole[1]] = new_im1[hole[0], hole[1]]
+    for hole in holes_im1:
+        combined_image[hole[0], hole[1]] = new_im0[hole[0], hole[1]]
+            
+    holes_im0 = set([tuple(row) for row in holes_im0])
+    holes_im1 = set([tuple(row) for row in holes_im1])
+    overlapping_holes = holes_im0 & holes_im1
+
+    if interpolate:
         for hole in overlapping_holes:
             closest_pixel = None
             second_closest_pixel = None
@@ -115,80 +125,10 @@ if __name__ == '__main__':
             combined_image[r, c] = np.round((closest_pixel + second_closest_pixel) / 2)
 
         # Use a median blur to remove any uncaught holes 
-        cv2.imwrite("interpolated_" + data_filepath + ".png", cv2.medianBlur(combined_image.astype('float32'), 3))
-        print("Interpolated image saved.")
+        image_path = "interpolated_" + data_filepath + ".png"
+        cv2.imwrite(image_path, cv2.medianBlur(combined_image.astype('float32'), 3))
+        print("Interpolated image saved as " + image_path + ".")
     else:
-        new_im0 = np.zeros_like(scene.im0)
-        new_im1 = np.zeros_like(scene.im1)
-        combined_image = np.zeros_like(scene.im0)
-
-        if ix is None:
-            ix = 0
-        iy = args.ycoord
-        if iy is None:
-            iy = 0
-        else:
-            iy = float(iy)
-
-        extrinsic_midpoint = utils.get_projection_matrix(0, 0, 0, 0, -ix * scene.baseline, iy * scene.baseline, 0)
-        cam_midpoint = np.copy(scene.cam0)
-        cam_midpoint[0][2] += ix * scene.doffs 
-        cam_midpoint[1][2] += iy * scene.doffs
-
-        depth_im0 = np.ones((new_im0.shape[0], new_im0.shape[1])) * np.inf
-        depth_im1 = np.ones((new_im0.shape[0], new_im0.shape[1])) * np.inf
-
-        for r in range(scene.height):
-            for c in range(scene.width):
-                if not scene.holes_disp0[r, c]:
-                    depth = scene.disp0[r, c]
-                    coords_3d_cam0 = depth * np.linalg.inv(scene.cam0) @ np.array([c, r, 1])
-                    coords_2d_cam0 = cam_midpoint @ extrinsic_midpoint @ np.array([coords_3d_cam0[0], coords_3d_cam0[1], coords_3d_cam0[2], 1]) 
-                    
-                    r_new, c_new = int(coords_2d_cam0[1]/coords_2d_cam0[2]), int(coords_2d_cam0[0]/coords_2d_cam0[2])
-
-                    if scene.in_bounds([c_new, r_new]):
-                        if depth < depth_im0[r_new, c_new]: 
-                            new_im0[r_new, c_new] = scene.im0[r, c] 
-                            depth_im0[r_new, c_new] = depth
-                        
-
-                if not scene.holes_disp1[r, c]:
-                    depth = scene.disp1[r, c]
-                    coords_3d_cam1 = depth * np.linalg.inv(scene.cam1) @ np.array([c, r, 1])
-                    
-                    coords_3d_cam1[0] += scene.baseline 
-
-                    coords_2d_cam1 = cam_midpoint @ extrinsic_midpoint @ np.array([coords_3d_cam1[0], coords_3d_cam1[1], coords_3d_cam1[2], 1])
-                    r_new, c_new = int(coords_2d_cam1[1]/coords_2d_cam1[2]), int(coords_2d_cam1[0]/coords_2d_cam1[2])
-
-                    if scene.in_bounds([c_new, r_new]):
-                        if depth < depth_im1[r_new, c_new]:
-                            new_im1[r_new, c_new] = scene.im1[r, c]
-                            depth_im1[r_new, c_new] = depth
-        print("Individual images reprojected.")
-        
-        # Interpolate between the two reprojected images
-        combined_image = 0.5 * new_im0 + 0.5 * new_im1
-
-        # Find what pixels are holes in each image by finding what wasn't mapped to in the new images
-        holes_im0 = np.transpose((depth_im0 == np.inf).nonzero())
-        holes_im1 = np.transpose((depth_im1 == np.inf).nonzero())
-
-        # Fill in holes with pixels from the other image to keep full opacity of pixels that aren't holes in at least one image
-        for hole in holes_im0:
-            combined_image[hole[0], hole[1]] = new_im1[hole[0], hole[1]]
-        for hole in holes_im1:
-            combined_image[hole[0], hole[1]] = new_im0[hole[0], hole[1]]
-                
-        holes_im0 = set([tuple(row) for row in holes_im0])
-        holes_im1 = set([tuple(row) for row in holes_im1])
-        overlapping_holes = holes_im0 & holes_im1
-
-        cv2.imwrite("halfway.png", combined_image)
-        print("saved halfway")
-
-        # Average over nearby pixels for holes present in both images to fill in gaps
         for hole in overlapping_holes:
             closest_pixel = None
             r, c = hole[0], hole[1]
@@ -233,5 +173,6 @@ if __name__ == '__main__':
 
         cv2.imwrite("extrapolated_output.png", combined_image)
         # Use a median blur to remove any uncaught holes 
-        cv2.imwrite("extrapolated_" + data_filepath + ".png", cv2.medianBlur(combined_image.astype('float32'), 3))
-        print("Extrapolated image saved.")
+        image_path = "extrapolated_" + data_filepath + ".png"
+        cv2.imwrite(image_path, cv2.medianBlur(combined_image.astype('float32'), 3))
+        print("Extrapolated image saved as " + image_path + ".")
