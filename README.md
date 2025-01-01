@@ -8,5 +8,6 @@ as the ```-d``` or ```--dataset``` argument. Further, you must specify whether y
 from the original image with the ```-i``` or ```--interpolate``` argument, which should be either ```True``` or
 ```False```. Finally, you can specify how much to move the camera around by with the arguments ```-x``` or ```-xcoord``` and 
 ```-y``` or ```-ycoord```.
+
 For example, to generate a view a quarter of the way between both cameras on the backpack dataset,
 run ```python main.py -d backpack -i True -x 0.25```.
