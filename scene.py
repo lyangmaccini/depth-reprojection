@@ -4,7 +4,7 @@ import utils
 
 class Scene:
     def __init__(self, filepath):
-        self.im0 = cv2.imread(filepath + "/im0.png") # shape: height, width, ch
+        self.im0 = cv2.imread(filepath + "/im0.png")
         self.im1 = cv2.imread(filepath + "/im1.png")
         self.read_calib(filepath)
         self.f = self.cam0[0][0]
@@ -28,7 +28,7 @@ class Scene:
         self.cam1 = [float(num) for line in self.cam1 for num in line.split(" ")]
         self.cam1 = np.array(self.cam1).reshape(3, 3)
 
-        self.doffs = c.readline() # distance between cameras in x direction 
+        self.doffs = c.readline() 
         self.doffs = float(self.doffs[6:]) 
 
         self.baseline = c.readline()
@@ -52,5 +52,5 @@ class Scene:
         self.extrinsic_cam0 = utils.get_projection_matrix(0, 0, 0, 0, 0, 0, 0)
         self.extrinsic_cam1 = utils.get_projection_matrix(0, 0, 0, 0, -self.baseline, 0, 0)
 
-    def in_bounds(self, coords):
-        return coords[0] > -1 and coords[0] < self.width and coords[0] > -1 and coords[1] < self.height
+    def in_bounds(self, r, c):
+        return c > -1 and c < self.width and r > -1 and r < self.height

@@ -2,6 +2,9 @@ import numpy as np
 import re
 import math
 
+# PFM file reading adapted from materials from the Computer Vision Group, University of Freiburg,
+# https://lmb.informatik.uni-freiburg.de/resources/datasets/SceneFlowDatasets.en.html and 
+# https://lmb.informatik.uni-freiburg.de/resources/datasets/IO.py 
 def readPFM(file):
     file = open(file, 'rb')
 
@@ -26,11 +29,11 @@ def readPFM(file):
         raise Exception('Malformed PFM header.')
 
     scale = float(file.readline().rstrip())
-    if scale < 0: # little-endian
+    if scale < 0: 
         endian = '<'
         scale = -scale
     else:
-        endian = '>' # big-endian
+        endian = '>'
 
     data = np.fromfile(file, endian + 'f')
     shape = (height, width, 3) if color else (height, width)
@@ -39,7 +42,7 @@ def readPFM(file):
     data = np.flipud(data)
     return data
 
-def get_projection_matrix(rx, ry, rz, theta, tx, ty, tz): # theta should be in radians
+def get_projection_matrix(rx, ry, rz, theta, tx, ty, tz): 
     projection = np.zeros((3, 4))
     c = math.cos(theta)
     s = math.sin(theta)
@@ -47,5 +50,3 @@ def get_projection_matrix(rx, ry, rz, theta, tx, ty, tz): # theta should be in r
     projection[1] = np.array([rx * ry * (1-c), c + ry * ry * (1-c), ry * rz * (1-c) - rx * s, ty])
     projection[2] = np.array([rx * rz * (1-c) - ry * s, ry * rz * (1-c) + rx * s, c + rz * rz * (1-c), tz])
     return projection
-
-

@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 import utils
-import math
+import imageio
 import argparse
 import scene
 
@@ -26,6 +26,13 @@ if __name__ == '__main__':
     ix = args.xcoord
     if ix is not None:
         ix = float(ix)
+    
+    # images = []
+    # filenames = ["data/" + data_filepath + "/im0.png", "outputs/interpolation/" + data_filepath + "/" + data_filepath + "_quarter_view.png",  "outputs/interpolation/" + data_filepath + "/" + data_filepath + "_halfway_view.png",  "outputs/interpolation/" + data_filepath + "/" + data_filepath + "_three_quarter_view.png", "data/" + data_filepath + "/im1.png"]
+    # for filename in filenames:
+    #     images.append(imageio.imread(filename))
+    # imageio.mimsave('outputs/interpolation/' + data_filepath + "/" + data_filepath + '.gif', images)
+    # print("GIF saved.")
 
     scene = scene.Scene("data/" + data_filepath)
 
@@ -67,7 +74,7 @@ if __name__ == '__main__':
                 # Convert to row/column indices
                 r_new, c_new = int(coords_2d_cam0[1]/coords_2d_cam0[2]), int(coords_2d_cam0[0]/coords_2d_cam0[2])
 
-                if scene.in_bounds([c_new, r_new]):
+                if scene.in_bounds(r_new, c_new):
                     # Save the original pixel to the new image, making sure that the closer object is visible if 2 object of different depths map to the same pixel
                     if depth < depth_im0[r_new, c_new]: 
                         new_im0[r_new, c_new] = scene.im0[r, c] 
@@ -84,7 +91,7 @@ if __name__ == '__main__':
                 coords_2d_cam1 = cam_midpoint @ extrinsic_midpoint @ np.array([coords_3d_cam1[0], coords_3d_cam1[1], coords_3d_cam1[2], 1])
                 r_new, c_new = int(coords_2d_cam1[1]/coords_2d_cam1[2]), int(coords_2d_cam1[0]/coords_2d_cam1[2])
 
-                if scene.in_bounds([c_new, r_new]):
+                if scene.in_bounds(r_new, c_new):
                     if depth < depth_im1[r_new, c_new]:
                         new_im1[r_new, c_new] = scene.im1[r, c]
                         depth_im1[r_new, c_new] = depth
@@ -93,30 +100,31 @@ if __name__ == '__main__':
     # Interpolate between the two reprojected images
     combined_image = 0.5 * new_im0 + 0.5 * new_im1
 
-    # Find what pixels are holes in each image by finding what wasn't mapped to in the new images
-    holes_im0 = np.transpose((depth_im0 == np.inf).nonzero())
-    holes_im1 = np.transpose((depth_im1 == np.inf).nonzero())
+    # Find what pixels are empty in each image by finding what wasn't mapped to in the new images
+    empty_pixels_im0 = np.transpose((depth_im0 == np.inf).nonzero())
+    empty_pixels_im1 = np.transpose((depth_im1 == np.inf).nonzero())
 
-    # Fill in holes with pixels from the other image to keep full opacity of pixels that aren't holes in at least one image
-    for hole in holes_im0:
-        combined_image[hole[0], hole[1]] = new_im1[hole[0], hole[1]]
-    for hole in holes_im1:
-        combined_image[hole[0], hole[1]] = new_im0[hole[0], hole[1]]
-            
-    holes_im0 = set([tuple(row) for row in holes_im0])
-    holes_im1 = set([tuple(row) for row in holes_im1])
-    overlapping_holes = holes_im0 & holes_im1
+    # Fill in empty pixels with pixels from the other image to keep full opacity of pixels that aren't empty in at least one image
+    for pixel in empty_pixels_im0:
+        combined_image[pixel[0], pixel[1]] = new_im1[pixel[0], pixel[1]]
+    for pixel in empty_pixels_im1:
+        combined_image[pixel[0], pixel[1]] = new_im0[pixel[0], pixel[1]]
+
+    # Find empty pixels in the same place in both images, which can't be filled with the above method  
+    empty_pixels_im0 = set([tuple(row) for row in empty_pixels_im0])
+    empty_pixels_im1 = set([tuple(row) for row in empty_pixels_im1])
+    overlapping_empty_pixels = empty_pixels_im0 & empty_pixels_im1
 
     if interpolate:
-        for hole in overlapping_holes:
+        for pixel in overlapping_empty_pixels:
             closest_pixel = None
             second_closest_pixel = None
-            r, c = hole[0], hole[1]
+            r, c = pixel[0], pixel[1]
             searching_bound = 1
             while second_closest_pixel is None:
                 for i in range(r - searching_bound, r + searching_bound + 1):
                     for j in range(c - searching_bound, c + searching_bound + 1):
-                        if scene.in_bounds([j, i]) and (i, j) not in overlapping_holes:
+                        if scene.in_bounds(i, j) and (i, j) not in overlapping_empty_pixels:
                             if closest_pixel is None:
                                 closest_pixel = combined_image[i, j]
                             else:
@@ -124,55 +132,59 @@ if __name__ == '__main__':
                 searching_bound += 1
             combined_image[r, c] = np.round((closest_pixel + second_closest_pixel) / 2)
 
-        # Use a median blur to remove any uncaught holes 
-        image_path = "interpolated_" + data_filepath + ".png"
+        # Use a median blur to reduce the effect of any irregulaties 
+        image_path = "outputs/interpolation/" + data_filepath + "/interpolated_" + data_filepath + ".png"
         cv2.imwrite(image_path, cv2.medianBlur(combined_image.astype('float32'), 3))
-        print("Interpolated image saved as " + image_path + ".")
+        print("Interpolated image saved to " + image_path + ".")
     else:
-        for hole in overlapping_holes:
+        cv2.imwrite("jgg.png", combined_image)
+        for pixel in overlapping_empty_pixels:
             closest_pixel = None
-            r, c = hole[0], hole[1]
+            r, c = pixel[0], pixel[1]
             searching_bound = 1
             while closest_pixel is None:
                 if ix == 0:
-                    j0 = int(c)
-                    j1 = int(c)
-                    i0 = int(r - searching_bound)
-                    i1 = int(r + searching_bound)
+                    j = c
+                    i = r
+                    if iy < 0:
+                        i -= searching_bound
+                    if iy > 0:
+                        i += searching_bound
                 if iy == 0:
-                    i0 = int(r)
-                    i1 = int(r)
-                    j0 = int(c - searching_bound)
-                    j1 = int(c + searching_bound)
+                    j = c
+                    i = r
+                    if ix < 0:
+                        if j - searching_bound > 0:
+                            j -= searching_bound
+                        else:
+                            j += searching_bound
+                    if ix > 0:
+                        if j + searching_bound < scene.width - 1:
+                            j += searching_bound
+                        else:
+                            j -= searching_bound
                 if ix == 0 or iy == 0:
-                    if scene.in_bounds([j0, i0]) and (i0, j0) not in overlapping_holes:
-                        closest_pixel = combined_image[i0, j0]
-                    if scene.in_bounds([j0, i1]) and (i1, j0) not in overlapping_holes:
-                        closest_pixel = combined_image[i1, j0]
-                    if scene.in_bounds([j1, i0]) and (i0, j1) not in overlapping_holes:
-                        closest_pixel = combined_image[i0, j1]
-                    if scene.in_bounds([j1, i1]) and (i1, j1) not in overlapping_holes:
-                        closest_pixel = combined_image[i1, j1]
+                    if scene.in_bounds(i, j) and (i, j) not in overlapping_empty_pixels:
+                        closest_pixel = combined_image[i, j]
                 else:
                     for i in range(r - searching_bound, r + searching_bound + 1):
                         j = c + searching_bound
-                        if scene.in_bounds([j, i]) and (i, j) not in overlapping_holes:
+                        if scene.in_bounds(i, j) and (i, j) not in overlapping_empty_pixels:
                             closest_pixel = combined_image[i, j]
                         j = c - searching_bound
-                        if scene.in_bounds([j, i]) and (i, j) not in overlapping_holes:
+                        if scene.in_bounds(i, j) and (i, j) not in overlapping_empty_pixels:
                             closest_pixel = combined_image[i, j]
                     for j in range(c - searching_bound, c + searching_bound + 1):
                         i = r + searching_bound
-                        if scene.in_bounds([j, i]) and (i, j) not in overlapping_holes:
+                        if scene.in_bounds(i, j) and (i, j) not in overlapping_empty_pixels:
                             closest_pixel = combined_image[i, j]
                         i = r - searching_bound
-                        if scene.in_bounds([j, i]) and (i, j) not in overlapping_holes:
+                        if scene.in_bounds(i, j) and (i, j) not in overlapping_empty_pixels:
                             closest_pixel = combined_image[i, j]
                 searching_bound += 1
             combined_image[r, c] = closest_pixel
 
         cv2.imwrite("extrapolated_output.png", combined_image)
-        # Use a median blur to remove any uncaught holes 
-        image_path = "extrapolated_" + data_filepath + ".png"
+        image_path = "outputs/extrapolation/" + data_filepath + "/extrapolated_" + data_filepath + ".png"
         cv2.imwrite(image_path, cv2.medianBlur(combined_image.astype('float32'), 3))
-        print("Extrapolated image saved as " + image_path + ".")
+        print("Extrapolated image saved to " + image_path + ".")
