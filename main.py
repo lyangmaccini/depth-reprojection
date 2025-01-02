@@ -137,7 +137,7 @@ if __name__ == '__main__':
         cv2.imwrite(image_path, cv2.medianBlur(combined_image.astype('float32'), 3))
         print("Interpolated image saved to " + image_path + ".")
     else:
-        cv2.imwrite("jgg.png", combined_image)
+        cv2.imwrite("jgg2.png", combined_image)
         for pixel in overlapping_empty_pixels:
             closest_pixel = None
             r, c = pixel[0], pixel[1]
@@ -184,7 +184,7 @@ if __name__ == '__main__':
                 searching_bound += 1
             combined_image[r, c] = closest_pixel
 
-        cv2.imwrite("extrapolated_output.png", combined_image)
-        image_path = "outputs/extrapolation/" + data_filepath + "/extrapolated_" + data_filepath + ".png"
+        cv2.imwrite("extrapolated_output2.png", combined_image)
+        image_path = "outputs/extrapolation/" + data_filepath + "/extrapolated_2" + data_filepath + ".png"
         cv2.imwrite(image_path, cv2.medianBlur(combined_image.astype('float32'), 3))
         print("Extrapolated image saved to " + image_path + ".")
