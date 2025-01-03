@@ -1,6 +1,7 @@
 import numpy as np
 import re
 import math
+import imageio
 
 # PFM file reading adapted from materials from the Computer Vision Group, University of Freiburg,
 # https://lmb.informatik.uni-freiburg.de/resources/datasets/SceneFlowDatasets.en.html and 
@@ -42,6 +43,7 @@ def readPFM(file):
     data = np.flipud(data)
     return data
 
+# Allows for rotation of projection matrix as well using Rodrigues' rotation matrix
 def get_projection_matrix(rx, ry, rz, theta, tx, ty, tz): 
     projection = np.zeros((3, 4))
     c = math.cos(theta)
@@ -50,3 +52,11 @@ def get_projection_matrix(rx, ry, rz, theta, tx, ty, tz):
     projection[1] = np.array([rx * ry * (1-c), c + ry * ry * (1-c), ry * rz * (1-c) - rx * s, ty])
     projection[2] = np.array([rx * rz * (1-c) - ry * s, ry * rz * (1-c) + rx * s, c + rz * rz * (1-c), tz])
     return projection
+
+def make_gif(data_filepath):
+    images = []
+    filenames = ["data/" + data_filepath + "/im0.png", "outputs/interpolation/" + data_filepath + "/" + data_filepath + "_quarter_view.png",  "outputs/interpolation/" + data_filepath + "/" + data_filepath + "_halfway_view.png",  "outputs/interpolation/" + data_filepath + "/" + data_filepath + "_three_quarter_view.png", "data/" + data_filepath + "/im1.png"]
+    for filename in filenames:
+        images.append(imageio.imread(filename))
+    imageio.mimsave('outputs/interpolation/' + data_filepath + "/" + data_filepath + '.gif', images)
+    print("GIF saved.")

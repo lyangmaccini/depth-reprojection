@@ -11,8 +11,8 @@ class Scene:
         self.disp0 = utils.readPFM(filepath + "/disp0.pfm")
         self.disp1 = utils.readPFM(filepath + "/disp1.pfm")   
         self.disparity_to_depth()
-        self.setup_extrinsics()
 
+    # Read all relevant information from the provided calibration file
     def read_calib(self, filepath):
         c = open(filepath + "/calib.txt", "r")
 
@@ -42,15 +42,13 @@ class Scene:
 
         c.close()
 
+    # Translate from disparity (pixels) to depth (mm)
     def disparity_to_depth(self):
         self.holes_disp0 = np.isinf(self.disp0)
         self.holes_disp1 = np.isinf(self.disp1)
         self.disp0 =  self.baseline * self.f / (self.disp0 + self.doffs)
         self.disp1 = self.baseline * self.f / (self.disp1 + self.doffs)
-    
-    def setup_extrinsics(self):
-        self.extrinsic_cam0 = utils.get_projection_matrix(0, 0, 0, 0, 0, 0, 0)
-        self.extrinsic_cam1 = utils.get_projection_matrix(0, 0, 0, 0, -self.baseline, 0, 0)
 
+    # Check whether a pixel is in the bounds of the scene
     def in_bounds(self, r, c):
         return c > -1 and c < self.width and r > -1 and r < self.height

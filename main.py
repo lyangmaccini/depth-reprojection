@@ -1,8 +1,6 @@
 import cv2
 import numpy as np
-import matplotlib.pyplot as plt
 import utils
-import imageio
 import argparse
 import scene
 
@@ -26,13 +24,6 @@ if __name__ == '__main__':
     ix = args.xcoord
     if ix is not None:
         ix = float(ix)
-    
-    # images = []
-    # filenames = ["data/" + data_filepath + "/im0.png", "outputs/interpolation/" + data_filepath + "/" + data_filepath + "_quarter_view.png",  "outputs/interpolation/" + data_filepath + "/" + data_filepath + "_halfway_view.png",  "outputs/interpolation/" + data_filepath + "/" + data_filepath + "_three_quarter_view.png", "data/" + data_filepath + "/im1.png"]
-    # for filename in filenames:
-    #     images.append(imageio.imread(filename))
-    # imageio.mimsave('outputs/interpolation/' + data_filepath + "/" + data_filepath + '.gif', images)
-    # print("GIF saved.")
 
     scene = scene.Scene("data/" + data_filepath)
 
@@ -115,42 +106,61 @@ if __name__ == '__main__':
     empty_pixels_im1 = set([tuple(row) for row in empty_pixels_im1])
     overlapping_empty_pixels = empty_pixels_im0 & empty_pixels_im1
 
-    if interpolate:
-        for pixel in overlapping_empty_pixels:
-            closest_pixel = None
-            second_closest_pixel = None
-            r, c = pixel[0], pixel[1]
-            searching_bound = 1
-            while second_closest_pixel is None:
-                for i in range(r - searching_bound, r + searching_bound + 1):
-                    for j in range(c - searching_bound, c + searching_bound + 1):
-                        if scene.in_bounds(i, j) and (i, j) not in overlapping_empty_pixels:
-                            if closest_pixel is None:
-                                closest_pixel = combined_image[i, j]
-                            else:
-                                second_closest_pixel = combined_image[i, j]
-                searching_bound += 1
-            combined_image[r, c] = np.round((closest_pixel + second_closest_pixel) / 2)
-
-        # Use a median blur to reduce the effect of any irregulaties 
-        image_path = "outputs/interpolation/" + data_filepath + "/interpolated_" + data_filepath + ".png"
-        cv2.imwrite(image_path, cv2.medianBlur(combined_image.astype('float32'), 3))
-        print("Interpolated image saved to " + image_path + ".")
-    else:
-        cv2.imwrite("jgg2.png", combined_image)
+    if interpolate or (not interpolate and ix != 0 and iy != 0):
+        # Find the closest pixels to average to fill in remaining gaps for interpolation/diagonal extrapolation gaps.
         for pixel in overlapping_empty_pixels:
             closest_pixel = None
             r, c = pixel[0], pixel[1]
             searching_bound = 1
             while closest_pixel is None:
-                if ix == 0:
+                for i in range(r - searching_bound, r + searching_bound + 1):
+                    j = c + searching_bound
+                    if scene.in_bounds(i, j) and (i, j) not in overlapping_empty_pixels:
+                        closest_pixel = combined_image[i, j]
+                    j = c - searching_bound
+                    if scene.in_bounds(i, j) and (i, j) not in overlapping_empty_pixels:
+                        closest_pixel = combined_image[i, j]
+                for j in range(c - searching_bound, c + searching_bound + 1):
+                    i = r + searching_bound
+                    if scene.in_bounds(i, j) and (i, j) not in overlapping_empty_pixels:
+                        closest_pixel = combined_image[i, j]
+                    i = r - searching_bound
+                    if scene.in_bounds(i, j) and (i, j) not in overlapping_empty_pixels:
+                        closest_pixel = combined_image[i, j]
+                searching_bound += 1
+            combined_image[r, c] = closest_pixel
+
+        image_path = "outputs/interpolation/" + data_filepath + "/interpolated_" + data_filepath + ".png"
+    else:
+        # To fill larger gaps in the image for extrapolation, find the closest pixels that are likely to be behind the 
+        # object causing the gaps. To ensure that the gap is filled with a background object, check the depth of the pixel
+        # used to fill the gap. Finally, count how many times surrounding pixels have been checked, in case no nearby pixels 
+        # have sufficient depth. In that case, ignore depth requirements and find the closest pixel.
+        for pixel in overlapping_empty_pixels:
+            closest_pixel = None
+            r, c = pixel[0], pixel[1]
+            searching_bound = 1
+            depth = scene.disp1[r, c]
+            counter = 0 
+            skip_depth = False 
+            while closest_pixel is None:
+                counter += 1
+                # If there is no x-direction movement, new gaps can likely be filled with the background above or below an object.
+                if ix == 0: 
+                    if counter > 2 * scene.height and not skip_depth: # ensure that the whole column hasn't already been checked
+                        searching_bound = 1
+                        skip_depth = True
                     j = c
                     i = r
                     if iy < 0:
                         i -= searching_bound
                     if iy > 0:
                         i += searching_bound
+                # Similarly, if there is no y-direction movement, fill new gaps with background to either side of an object.
                 if iy == 0:
+                    if counter >= 2 * scene.width and not skip_depth: # ensure that the whole row hasn't been already checked
+                        searching_bound = 1
+                        skip_depth = True
                     j = c
                     i = r
                     if ix < 0:
@@ -163,28 +173,17 @@ if __name__ == '__main__':
                             j += searching_bound
                         else:
                             j -= searching_bound
-                if ix == 0 or iy == 0:
-                    if scene.in_bounds(i, j) and (i, j) not in overlapping_empty_pixels:
+                if scene.in_bounds(i, j) and (i, j) not in overlapping_empty_pixels:
+                    if not skip_depth:
+                        if depth_im1[i, j] > 1.5 * depth:
+                            closest_pixel = combined_image[i, j]
+                    else:
                         closest_pixel = combined_image[i, j]
-                else:
-                    for i in range(r - searching_bound, r + searching_bound + 1):
-                        j = c + searching_bound
-                        if scene.in_bounds(i, j) and (i, j) not in overlapping_empty_pixels:
-                            closest_pixel = combined_image[i, j]
-                        j = c - searching_bound
-                        if scene.in_bounds(i, j) and (i, j) not in overlapping_empty_pixels:
-                            closest_pixel = combined_image[i, j]
-                    for j in range(c - searching_bound, c + searching_bound + 1):
-                        i = r + searching_bound
-                        if scene.in_bounds(i, j) and (i, j) not in overlapping_empty_pixels:
-                            closest_pixel = combined_image[i, j]
-                        i = r - searching_bound
-                        if scene.in_bounds(i, j) and (i, j) not in overlapping_empty_pixels:
-                            closest_pixel = combined_image[i, j]
                 searching_bound += 1
             combined_image[r, c] = closest_pixel
 
-        cv2.imwrite("extrapolated_output2.png", combined_image)
-        image_path = "outputs/extrapolation/" + data_filepath + "/extrapolated_2" + data_filepath + ".png"
-        cv2.imwrite(image_path, cv2.medianBlur(combined_image.astype('float32'), 3))
-        print("Extrapolated image saved to " + image_path + ".")
+        image_path = "outputs/extrapolation/" + data_filepath + "/extrapolated_" + data_filepath + "_" + str(ix) + "_" + str(iy) + ".png"
+
+    # Use a median blur to reduce the effect of any remaining irregulaties 
+    cv2.imwrite(image_path, cv2.medianBlur(combined_image.astype('float32'), 3))
+    print("Image saved to " + image_path + ".")
