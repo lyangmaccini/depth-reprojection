@@ -2,7 +2,7 @@
 In this project, I use two views of the same scene and their corresponding disparity maps to 
 first generate images interpolating between the two views, and then extrapolate beyond either 
 view. When running the project, you can choose what dataset from the Middlebury stereo datasets
-to run. Currently, the available datasets are those in the ```data``` folder: ```backpack```, ```jadeplant```,
+to run. Currently, the available datasets are those in the ```data``` folder: ```backpack```, ```jadeplant```, ```piano```, 
 and ```motorcycle```. To choose a dataset, pass the dataset's name in the ```data``` folder 
 as the ```-d``` or ```--dataset``` argument. Further, you must specify whether you want to interpolate or extrapolate 
 from the original image with the ```-i``` or ```--interpolate``` argument, which should be either ```True``` or
@@ -17,15 +17,16 @@ Backpack dataset:
 View halfway between the two input views-
 ![backpack_halfway_view](https://github.com/user-attachments/assets/9c80fb2e-afee-40d8-b4f9-ee108a0ca0f1)
 
-Jade plant dataset:
-![jadeplant_halfway_view](https://github.com/user-attachments/assets/09d8e3e5-95e3-43cf-837a-f72ec65675c9)
-
 Motorcycle dataset:
 ![motorcycle_halfway_view](https://github.com/user-attachments/assets/df238cbf-520b-45f0-9712-fb8e68445921)
 
-To see more examples of interpolation and GIFs of camera translation, see ```outputs/interpolation```.
+To see more examples of interpolation, GIFs of camera translation, and other datasets, see ```outputs/interpolation```.
 
 # Results- Extrapolation 
-Backpack dataset, view beyond either camera in the x-direction (to the right of the rightmost camera): 
+Backpack dataset, view beyond either camera in the x-direction (to the right of the rightmost camera, moved 0.25 time the baseline to the right): 
+![extrapolated_backpack_1 25_0](https://github.com/user-attachments/assets/53ebd884-d2ab-4bc3-bd92-ae4ac8597575)
 
-Backpack dataset, view to the left of leftmost camera:
+Motorcycle dataset, view to the left of leftmost camera (camera moved by 0.5 times the baseline to the left):
+![extrapolated_motorcycle_-0 5_0](https://github.com/user-attachments/assets/b6006a0f-d0c6-4887-9a67-5dff60f5c2a9)
+
+To see more examples of extrapolation and other datasets, see ```outputs/extrapolation```.
