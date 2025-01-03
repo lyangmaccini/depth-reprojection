@@ -26,7 +26,5 @@ To see more examples of interpolation, GIFs of camera translation, and other dat
 Backpack dataset, view beyond either camera in the y-direction (above both cameraa, moved 0.1 times the baseline up): 
 ![extrapolated_backpack_0_0 1](https://github.com/user-attachments/assets/347e8df1-a7db-4cd4-8517-943b6786a537)
 
-Motorcycle dataset, view to the left of leftmost camera (camera moved by 0.5 times the baseline to the left):
-![extrapolated_motorcycle_-0 5_0](https://github.com/user-attachments/assets/b6006a0f-d0c6-4887-9a67-5dff60f5c2a9)
-
-To see more examples of extrapolation and other datasets, see ```outputs/extrapolation```.
+To see more examples of extrapolation and other datasets, see ```outputs/extrapolation```. Images are all named beginning with "extrapolation",
+then the dataset, then the x-direction movement, and then the y-direction movement. 
