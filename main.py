@@ -153,9 +153,15 @@ if __name__ == '__main__':
                     j = c
                     i = r
                     if iy < 0:
-                        i -= searching_bound
+                        if i + searching_bound < scene.height - 1:
+                            i += searching_bound
+                        else:
+                            i -= searching_bound - r + 1
                     if iy > 0:
-                        i += searching_bound
+                        if i - searching_bound > 0:
+                            i -= searching_bound
+                        else:
+                            i += searching_bound - r + 1
                 # Similarly, if there is no y-direction movement, fill new gaps with background to either side of an object.
                 if iy == 0:
                     if counter >= 2 * scene.width and not skip_depth: # ensure that the whole row hasn't been already checked
@@ -165,16 +171,16 @@ if __name__ == '__main__':
                     i = r
                     if ix < 0:
                         if j - searching_bound > 0:
-                            j -= searching_bound
+                            j -= searching_bound - c + 1
                         else:
-                            j += searching_bound
+                            j += searching_bound - c + 1
                     if ix > 0:
                         if j + searching_bound < scene.width - 1:
                             j += searching_bound
                         else:
                             j -= searching_bound
                 if scene.in_bounds(i, j) and (i, j) not in overlapping_empty_pixels:
-                    if not skip_depth:
+                    if not skip_depth and iy == 0 and ix == 0:
                         if depth_im1[i, j] > 1.5 * depth:
                             closest_pixel = combined_image[i, j]
                     else:
